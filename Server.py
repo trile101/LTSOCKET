@@ -5,12 +5,14 @@ import threading
 import time
 import pyautogui
 import os
+import wmi
 
-def take_picture():
+def take_picture(Client_socket):
 	while True:
 		Code = Client_socket.recv(1).decode("utf8")
 		# Take picture
-		if (Code == 4):
+		if (Code == "1"):
+			print("oke - da chup anh")
 			#screen capture
 			myScreenshot = pyautogui.screenshot()
 			myScreenshot.save(r'test.jpg')
@@ -25,12 +27,17 @@ def take_picture():
 			file.close()
 			os.remove("test.jpg")
 		# Quit
-		if (Code == 2):
+		if (Code == "0"):
 			break
 
 def Shutdown_Computer():
 	os.system("C:\Windows\System32\shutdown /s /t 30")
+
+def Process(Client_socket):
+	c = wmi.WMI()
+	
 def Run():
+
 	Server.bind(Address)
 	try:
 		Server.listen()
@@ -38,13 +45,31 @@ def Run():
 		Client_socket, Client_add = Server.accept()
 		while True:
 			Code = Client_socket.recv(1).decode("utf8")
+			#QUIT
+			if (Code == "0"):
+				break
+			#Process
+			if (Code == "1"):
+				Process(Client_socket)
+			#App Running
+			if (Code == "2"):
+				break
+			#ShutDown
+			if (Code == "3"):
+				Shutdown_Computer()
 			#TAKEPIC
 			if (Code == "4"):
-				take_picture()
-			#ShutDown
-			if (Code == "1"):
-			#Process
-			if (Code == "2"):
+				take_picture(Client_socket)
+				break
+			#KeyStock
+			if (Code == "5"):
+				break
+			#Edit_Register
+			if (Code == "6"):
+				break
+			#Exit
+			if (Code == "7"):
+				break
 
 	except:
 		print("Close")
@@ -58,7 +83,7 @@ def on_closing():
 	window.destroy()
 
 HOST = ''
-PORT = 1225
+PORT = 12225
 Address = (HOST, PORT)
 Server = socket(AF_INET, SOCK_STREAM)
 
