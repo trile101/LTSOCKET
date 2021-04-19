@@ -5,7 +5,7 @@ import threading
 import time
 import pyautogui
 import os
-import wmi
+# import wmi
 
 def take_picture(Client_socket):
 	while True:
@@ -15,17 +15,19 @@ def take_picture(Client_socket):
 			print("oke - da chup anh")
 			#screen capture
 			myScreenshot = pyautogui.screenshot()
-			myScreenshot.save(r'test.jpg')
+			f = myScreenshot.tobytes()
+			sizef = f.__sizeof__()
 
-			file = open('test.jpg', "rb")
-			file_data = file.read(2048)
+			Client_socket.sendall(bytes(str(sizef),'utf8'))
+			Client_socket.recv(1).decode('utf8')
 
-			while file_data:
-				Client_socket.send(file_data)
-				file_data = file.read(2048)
+			Client_socket.sendall(bytes(str(myScreenshot.width),'utf8'))
+			Client_socket.recv(1).decode('utf8')
 
-			file.close()
-			os.remove("test.jpg")
+			Client_socket.sendall(bytes(str(myScreenshot.height),'utf8'))
+			Client_socket.recv(1).decode('utf8')
+
+			Client_socket.sendall(f)
 		# Quit
 		if (Code == "0"):
 			break

