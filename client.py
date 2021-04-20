@@ -9,6 +9,7 @@ import socket
 import win32api
 
 #=============================== Define control code ===============================#
+
 QUIT             =  '0'
 PROCESS_RUNNING  =  '1'
 APP_RUNNING      =  '2'
@@ -17,15 +18,18 @@ SCREEN_CAPTURE   =  '4'
 KEYSTROKE        =  '5'
 EDIT_REGISTRY    =  '6'
 EXIT             =  '7'
-KILL             =  '8'
-START            =  '9'
-#=============================== +++++++++++++++++++++++++ ===============================#
-PORT             = 12225
 
+KILL             =  'K'
+START            =  'S'
+VIEW             =  'V'
+
+#=============================== +++++++++++++++++++++++++ ===============================#
+
+PORT             =  12225
 
 #=============================== Declare class of function ===============================#
 class Process(Toplevel):
-    def __init__(self,cl,master = None):
+    def __init__(self,client,master = None):
         super().__init__(master)
 
         self.master = master
@@ -33,7 +37,7 @@ class Process(Toplevel):
 
         self.grab_set()
 
-        self.client = cl
+        self.client = client
         
         self.fr1 = Frame(self,padx = 10,pady = 10)
         self.fr1.pack(side = TOP)
@@ -83,6 +87,22 @@ class Process(Toplevel):
         pass
 
     def view(self):
+        for i in self.tree.get_children():
+            self.tree.delete(i)
+
+        self.client.sendall(bytes(VIEW,'utf8'))
+        while True:
+            pid = self.client.recv(2048).decode("utf8")
+            if pid == '__END__':
+                break
+            self.client.sendall(bytes('1',"utf8"))
+
+            name = self.client.recv(2048).decode('utf8')
+            self.client.sendall(bytes('1','utf8'))
+
+            threadcount = self.client.recv(2048).decode('utf8')
+            self.client.sendall(bytes('1','utf8'))
+            self.tree.insert('','end',values = (name,pid,threadcount))
         pass
 
     def delete(self):
@@ -104,6 +124,7 @@ class Process(Toplevel):
             self.grab_release()
             if self.master != None:
                 self.master.grab_set()
+            self.client.sendall(bytes(QUIT,"utf8"))
             self.destroy()
         else:
             func.grab_release()
@@ -213,8 +234,6 @@ class Pic(Toplevel):
         self.fr1.configure(highlightbackground="black",highlightthickness=1)
         self.fr1.pack(side = LEFT,padx = 20, pady = 20)
 
-        self.take()
-
         self.fr2 = Frame(self)
         self.fr2.pack(side = RIGHT,padx=10,pady=10)
 
@@ -224,6 +243,8 @@ class Pic(Toplevel):
         self.save_btn = Button(self.fr2,text = 'Save',height = 5, width = 10,font = 10,bd=5,command = self.save)
         self.save_btn.pack(side = BOTTOM)
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+        self.take()
 
     def take(self):
         for widget in self.fr1.winfo_children():
@@ -263,6 +284,7 @@ class Pic(Toplevel):
             self.grab_release()
             if self.master != None:
                 self.master.grab_set()
+            self.client.sendall(bytes(QUIT,"utf8"))
             self.destroy()
         else:
             func.grab_release()
@@ -418,8 +440,8 @@ class App(Tk):
 
     def Process_running(self):
         if self.connected:
+            self.client.sendall(bytes(PROCESS_RUNNING,'utf8'))
             Viewapp = Process(self.client,self)
-            # self.grab_set()
         else:
             messagebox.showerror(title="Error", message="Opps\nConnection error!")            
         pass
@@ -427,7 +449,6 @@ class App(Tk):
     def App_running(self):
         if self.connected:
             Viewapp = ListApp(self.client,self)
-            # self.grab_set()
         else:
             messagebox.showerror(title="Error", message="Opps\nConnection error!")
         pass
