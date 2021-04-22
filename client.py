@@ -22,6 +22,9 @@ EXIT             =  '7'
 KILL             =  'K'
 START            =  'S'
 VIEW             =  'V'
+HOOK			 =  'H'
+UNHOOK			 =  'U'
+PRINT            =  'P'
 
 #=============================== +++++++++++++++++++++++++ ===============================#
 
@@ -45,7 +48,7 @@ class Process(Toplevel):
         self.fr2 = Frame(self,padx = 10, pady = 10)
         self.fr2.pack(side = BOTTOM)
 
-        self.kill_btn = Button(self.fr1,text = "Kill",bd=3,width = 10,command=self.kill)
+        self.kill_btn = Button(self.fr1,text = "Kill",bd=3,width = 10,command=self.kill_dialog)
         self.kill_btn.pack(side = LEFT,padx = 5,pady= 5)
 
         self.view_btn = Button(self.fr1,text = "View",bd=3,width = 10,command=self.view)
@@ -54,7 +57,7 @@ class Process(Toplevel):
         self.del_btn = Button(self.fr1,text = "Delete",bd=3,width = 10,command=self.delete)
         self.del_btn.pack(side = LEFT,padx = 5,pady= 5)
 
-        self.start_btn = Button(self.fr1,text = "Start",bd=3,width = 10,command=self.start)
+        self.start_btn = Button(self.fr1,text = "Start",bd=3,width = 10,command=self.start_dialog)
         self.start_btn.pack(side = LEFT,padx = 5,pady= 5)
 
         self.tree = ttk.Treeview(self.fr2,selectmode = 'browse')
@@ -67,7 +70,7 @@ class Process(Toplevel):
 
         self.tree['columns'] = ("1","2","3")
         self.tree['show'] = 'headings'
-        self.tree.column("1",width = 100,anchor = 'c')
+        self.tree.column("1",width = 150,anchor = 'c')
         self.tree.column("2",width = 100,anchor = 'c')
         self.tree.column("3",width = 100,anchor = 'c')
         self.tree.heading("1",text = "Name Process")
@@ -75,13 +78,27 @@ class Process(Toplevel):
         self.tree.heading("3",text = "Count Thread")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-    def kill(self):
+    def kill(self,id_input):
+        pid = id_input.get()
+        if pid != "":
+            self.client.sendall(bytes(KILL,'utf8'))
+            self.client.recv(1)
+            self.client.sendall(bytes(pid,'utf8'))
+            if self.client.recv(1).decode('utf8') == '0':
+                messagebox.showerror("ERROR","Error!")
+            else:
+                messagebox.showinfo("INFO","Success!")
+            self.on_closing
+        pass
+
+
+    def kill_dialog(self):
         t = Toplevel()
         t.grab_set()
         id_input = Entry(t,bd=3,width = 25)
         id_input.insert(0,"Input ID")
         id_input.pack(side=LEFT, padx=10,pady=10)
-        k = Button(t,text='Kill')
+        k = Button(t,text='Kill',command=lambda:self.kill(id_input,))
         k.pack(side=LEFT, padx=10,pady=10)
         t.protocol("WM_DELETE_WINDOW", lambda: self.on_closing(t))
         pass
@@ -91,6 +108,7 @@ class Process(Toplevel):
             self.tree.delete(i)
 
         self.client.sendall(bytes(VIEW,'utf8'))
+        temp = []
         while True:
             pid = self.client.recv(2048).decode("utf8")
             if pid == '__END__':
@@ -102,20 +120,36 @@ class Process(Toplevel):
 
             threadcount = self.client.recv(2048).decode('utf8')
             self.client.sendall(bytes('1','utf8'))
-            self.tree.insert('','end',values = (name,pid,threadcount))
+            temp.append((name,pid,threadcount))
+        for item in temp:
+            self.tree.insert('','end',values = (item))
         pass
 
     def delete(self):
+        for i in self.tree.get_children():
+            self.tree.delete(i)
+        pass
+
+    def start(self,id_input):
+        name = id_input.get()
+        if name != "":
+            self.client.sendall(bytes(START,'utf8'))
+            self.client.recv(1)
+            self.client.sendall(bytes(name,'utf8'))
+            if self.client.recv(1).decode('utf8') == '0':
+                messagebox.showerror("ERROR","Error!")
+            else:
+                messagebox.showinfo("INFO","Success!")
         pass
     
-    def start(self):
+    def start_dialog(self):
         t = Toplevel()
         t.grab_set()
         id_input = Entry(t,bd=3,width = 25)
         id_input.insert(0,"Input name")
         id_input.pack(side=LEFT, padx=10,pady=10)
-        k = Button(t,text='Start')
-        k.pack(side=LEFT, padx=10,pady=10)
+        s = Button(t,text='Start',command=lambda: self.start(id_input,))
+        s.pack(side=LEFT, padx=10,pady=10)
         t.protocol("WM_DELETE_WINDOW", lambda: self.on_closing(t))
         pass
 
@@ -150,7 +184,7 @@ class ListApp(Toplevel):
         self.fr2 = Frame(self,padx = 10, pady = 10)
         self.fr2.pack(side = BOTTOM)
 
-        self.kill_btn = Button(self.fr1,text = "Kill",bd=3,width = 10,command=self.kill)
+        self.kill_btn = Button(self.fr1,text = "Kill",bd=3,width = 10,command=self.kill_dialog)
         self.kill_btn.pack(side = LEFT,padx = 5,pady= 5)
 
         self.view_btn = Button(self.fr1,text = "View",bd=3,width = 10,command=self.view)
@@ -159,7 +193,7 @@ class ListApp(Toplevel):
         self.del_btn = Button(self.fr1,text = "Delete",bd=3,width = 10,command=self.delete)
         self.del_btn.pack(side = LEFT,padx = 5,pady= 5)
 
-        self.start_btn = Button(self.fr1,text = "Start",bd=3,width = 10,command=self.start)
+        self.start_btn = Button(self.fr1,text = "Start",bd=3,width = 10,command=self.start_dialog)
         self.start_btn.pack(side = LEFT,padx = 5,pady= 5)
 
         self.tree = ttk.Treeview(self.fr2,selectmode = 'browse')
@@ -172,7 +206,7 @@ class ListApp(Toplevel):
 
         self.tree['columns'] = ("1","2","3")
         self.tree['show'] = 'headings'
-        self.tree.column("1",width = 100,anchor = 'c')
+        self.tree.column("1",width = 150,anchor = 'c')
         self.tree.column("2",width = 100,anchor = 'c')
         self.tree.column("3",width = 100,anchor = 'c')
         self.tree.heading("1",text = "Name Application")
@@ -180,31 +214,77 @@ class ListApp(Toplevel):
         self.tree.heading("3",text = "Count Thread")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-    def kill(self):
+    def kill(self,id_input):
+        pid = id_input.get()
+        if pid != "":
+            self.client.sendall(bytes(KILL,'utf8'))
+            self.client.recv(1)
+            self.client.sendall(bytes(pid,'utf8'))
+            if self.client.recv(1).decode('utf8') == '0':
+                messagebox.showerror("ERROR","Error!")
+            else:
+                messagebox.showinfo("INFO","Success!")
+        pass
+
+
+    def kill_dialog(self):
         t = Toplevel()
         t.grab_set()
         id_input = Entry(t,bd=3,width = 25)
         id_input.insert(0,"Input ID")
         id_input.pack(side=LEFT, padx=10,pady=10)
-        k = Button(t,text='Kill')
+        k = Button(t,text='Kill',command=lambda:self.kill(id_input,))
         k.pack(side=LEFT, padx=10,pady=10)
         t.protocol("WM_DELETE_WINDOW", lambda: self.on_closing(t))
         pass
 
     def view(self):
+        for i in self.tree.get_children():
+            self.tree.delete(i)
+
+        self.client.sendall(bytes(VIEW,'utf8'))
+        temp = []
+        while True:
+            pid = self.client.recv(2048).decode("utf8")
+            if pid == '__END__':
+                break
+            self.client.sendall(bytes('1',"utf8"))
+
+            name = self.client.recv(2048).decode('utf8')
+            self.client.sendall(bytes('1','utf8'))
+
+            threadcount = self.client.recv(2048).decode('utf8')
+            self.client.sendall(bytes('1','utf8'))
+            temp.append((name,pid,threadcount))
+        for item in temp:
+            self.tree.insert('','end',values = (item))
         pass
 
     def delete(self):
+        for i in self.tree.get_children():
+            self.tree.delete(i)
+        pass
+
+    def start(self,id_input):
+        name = id_input.get()
+        if name != "":
+            self.client.sendall(bytes(START,'utf8'))
+            self.client.recv(1)
+            self.client.sendall(bytes(name,'utf8'))
+            if self.client.recv(1).decode('utf8') == '0':
+                messagebox.showerror("ERROR","Error!")
+            else:
+                messagebox.showinfo("INFO","Success!")
         pass
     
-    def start(self):
+    def start_dialog(self):
         t = Toplevel()
         t.grab_set()
         id_input = Entry(t,bd=3,width = 25)
         id_input.insert(0,"Input name")
         id_input.pack(side=LEFT, padx=10,pady=10)
-        k = Button(t,text='Start')
-        k.pack(side=LEFT, padx=10,pady=10)
+        s = Button(t,text='Start',command=lambda: self.start(id_input,))
+        s.pack(side=LEFT, padx=10,pady=10)
         t.protocol("WM_DELETE_WINDOW", lambda: self.on_closing(t))
         pass
 
@@ -213,6 +293,7 @@ class ListApp(Toplevel):
             self.grab_release()
             if self.master != None:
                 self.master.grab_set()
+            self.client.sendall(bytes(QUIT,"utf8"))
             self.destroy()
         else:
             func.grab_release()
@@ -298,11 +379,9 @@ class Keylog(Toplevel):
         self.client = client
         self.master = master
         self.title('Keystroke')
+        self.is_hooking = False
 
         self.grab_set()
-
-        self.keys = StringVar()
-        self.keys.set('')
 
         self.fr1 = Frame(self,padx=10,pady=10)
         self.fr1.pack(side = TOP)
@@ -332,15 +411,31 @@ class Keylog(Toplevel):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def hook(self):
+        if not self.is_hooking:
+            self.is_hooking = True
+            self.client.sendall(bytes(HOOK,'utf8'))
         pass
 
     def unhook(self):
+        if self.is_hooking:
+            self.client.sendall(bytes(UNHOOK,'utf8'))
         pass
 
     def print(self):
+        self.client.sendall(bytes(PRINT,'utf8'))
+        size = int(self.client.recv(2048).decode('utf8'))
+        self.client.sendall(bytes('1','utf8'))
+        keys = int(self.client.recv(size).decode('utf8'))
+        self.client.sendall(bytes('1','utf8'))
+        self.text.configure(state = NORMAL)
+        self.text.insert(END,keys)
+        self.text.configure(state = DISABLED)
         pass
 
     def delete(self):
+        self.text.configure(state = NORMAL)
+        self.text.delete(1.0,END)
+        self.text.configure(state = DISABLED)
         pass
 
     def on_closing(self,func=None):
@@ -348,6 +443,7 @@ class Keylog(Toplevel):
             self.grab_release()
             if self.master != None:
                 self.master.grab_set()
+            self.client.sendall(bytes(QUIT,"utf8"))
             self.destroy()
         else:
             func.grab_release()
@@ -448,6 +544,7 @@ class App(Tk):
 
     def App_running(self):
         if self.connected:
+            self.client.sendall(bytes(APP_RUNNING,'utf8'))
             Viewapp = ListApp(self.client,self)
         else:
             messagebox.showerror(title="Error", message="Opps\nConnection error!")
@@ -466,6 +563,7 @@ class App(Tk):
 
     def Keystroke(self):
         if self.connected:
+            self.client.sendall(bytes(KEYSTROKE,'utf8'))
             Viewapp = Keylog(self.client,self)
         else:
             messagebox.showerror(title="Error", message="Opps\nConnection error!")
