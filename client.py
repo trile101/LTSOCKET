@@ -2,6 +2,7 @@ from tkinter import *
 from tkinter import messagebox
 from tkinter import filedialog
 from tkinter import ttk
+from tkinter import scrolledtext
 from PIL import ImageTk, Image
 import pyautogui
 import os
@@ -25,6 +26,8 @@ VIEW             =  'V'
 HOOK			 =  'H'
 UNHOOK			 =  'U'
 PRINT            =  'P'
+CONTENT          =  'C'
+EDIT             =  'E'
 
 #=============================== +++++++++++++++++++++++++ ===============================#
 
@@ -458,10 +461,12 @@ class Keylog(Toplevel):
 
 class Registry(Toplevel):
     def __init__(self,client,master = None):
-        super().__init__(self,master)
+        super().__init__(master)
 
         self.client = client
         self.title('Registry')
+
+        self.grab_set()
 
         self.fr1 = Frame(self)
         self.fr1.pack()
@@ -469,8 +474,161 @@ class Registry(Toplevel):
         self.fr2 = Frame(self)
         self.fr2.pack()
 
-        self.fr3 = Frame(self)
-        self.fr3.pack()
+        self.path = Entry(self.fr1,width = 55,bd=3)
+        self.path.insert(0,'Đường dẫn...')
+        self.path.grid(column = 0,row=0,padx=10,pady=10)
+        self.browser_btn = Button(self.fr1,text = 'Browser...',bd=3,width = 11,height = 1,command = self.loadContent)
+        self.browser_btn.grid(column = 1,row=0,padx=10,pady=10)
+
+        self.content = scrolledtext.ScrolledText(self.fr1,wrap = WORD,width = 42,height = 5,bd = 3)
+        self.content.insert(INSERT,'Nội dung')
+        self.content.grid(column = 0,row = 1,padx = 10,pady = 10)
+
+        self.send_content_btn = Button(self.fr1,text = 'Send content',bd = 3,width = 11 , height = 5,command = self.sendContent)
+        self.send_content_btn.grid(column = 1,row=1,padx=10,pady=10)
+
+        self.label_frame = LabelFrame(self.fr2,text = 'Sửa giá trị trực tiếp')
+        self.label_frame.pack()
+
+        self.var = StringVar()
+        self.var.set('Chọn chức năng')
+        self.option = ttk.Combobox(self.label_frame,width = 65,textvariable = self.var)
+        self.option['values'] = ('Get value','Set value','Delete value','Create key','Delete key')
+        self.option.bind("<<ComboboxSelected>>", self.chooseAction)
+        self.option.pack(padx = 10,pady = 10)
+
+        self.path1 = Entry(self.label_frame,width = 67,bd = 3)
+        self.path1.insert(0,'Đường dẫn')
+        self.path1.pack(padx = 10,pady = 10)
+
+        self.frtemp = Frame(self.label_frame)
+        self.frtemp.pack()
+
+        self.name_entry = Entry(self.frtemp,width = 20,bd = 3)
+        self.name_entry.insert(0,'Name value')
+        self.name_entry.pack(side = LEFT,padx = 10,pady = 10,anchor = 'w')
+
+        self.value_entry = Entry(self.frtemp,width = 20,bd = 3)
+        self.value_entry.insert(0,'Value')
+        self.value_entry.pack(side = LEFT,padx = 5,pady = 10,anchor = 'n')
+
+        self.var1 = StringVar()
+        self.var1.set('Kiểu dữ liệu')
+        self.data_type = ttk.Combobox(self.frtemp,width = 20,textvariable = self.var1)
+        self.data_type['values'] = ('String','Binary','DWORD','QWORD','Multi-String','Expandable String')
+        self.data_type.pack(side = LEFT ,padx = 10,pady = 10)
+
+        self.result = Text(self.label_frame,wrap = WORD,width = 54,height = 5,bd = 3)
+        self.result.configure(state = DISABLED)
+        self.result.pack(padx = 10,pady=10)
+
+        self.frbtn = Frame(self.label_frame)
+        self.frbtn.pack()
+
+        self.send_btn = Button(self.frbtn,text = 'Send',width = 10,height = 3,bd = 3,command = self.sendToEdit)
+        self.send_btn.pack(side = LEFT,padx = 20,pady=10)
+
+        self.del_btn = Button(self.frbtn,text = 'Delete',width = 10,height = 3,bd=3,command=self.delResult)
+        self.del_btn.pack(side = RIGHT,padx=20,pady=10)
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def loadContent(self):
+        file = filedialog.askopenfilename(title = "Select file",filetypes = (("reg files","*.reg"),))
+        if not file or file == '':
+            return
+        try:
+            self.path.delete('0','end')
+            self.path.insert(0,file)
+            f = open(file)
+            self.content.delete(1.0,'end')
+            self.content.insert(INSERT,f.read())
+            f.close()
+        except Exception as e:
+            print(e)
+        pass
+
+    def sendContent(self):
+        self.client.sendall(bytes(CONTENT,"utf8"))
+        s = self.content.get('1.0', 'end-1c')
+        print(s)
+        self.client.sendall(bytes(str(s),'utf8'))
+        self.client.recv(1)
+        announce = self.client.recv(1).decode('utf8')
+        if announce == '1':
+            messagebox.showinfo('Info','Edit successfully!')
+        else:
+            messagebox.showinfo('Info','Edit failed!')
+        pass
+
+    def chooseAction(self,eventObject):
+        action = self.option.get()
+        print(action)
+        if action == 'Create key' or action == 'Delete key':
+            self.name_entry.pack_forget()
+            self.value_entry.pack_forget()
+            self.data_type.pack_forget()
+        elif action == 'Get value' or action == 'Delete value':
+            self.value_entry.pack_forget()
+            self.data_type.pack_forget()
+            self.name_entry.pack(side = LEFT,padx = 10,pady = 10,anchor = 'w')
+        else:
+            self.name_entry.pack(side = LEFT,padx = 10,pady = 10,anchor = 'w')
+            self.value_entry.pack(side = LEFT,padx = 5,pady = 10,anchor = 'n')
+            self.data_type.pack(side = LEFT ,padx = 10,pady = 10)
+        pass
+
+    def sendToEdit(self):
+        self.client.sendall(bytes(EDIT,'utf8'))
+        
+        self.client.sendall(bytes(str(self.option.get()),'utf8'))
+        self.client.recv(1)
+
+        self.client.sendall(bytes(str(self.path1.get()),'utf8'))
+        self.client.recv(1)
+
+        self.client.sendall(bytes(str(self.name_entry.get()),'utf8'))
+        self.client.recv(1)
+
+        self.client.sendall(bytes(str(self.value_entry.get()),'utf8'))
+        self.client.recv(1)
+
+        self.client.sendall(bytes(str(self.data_type.get()),'utf8'))
+        self.client.recv(1)
+
+        announce = self.client.recv(1024).decode('utf8')
+        self.client.sendall(bytes('1','utf8'))
+        if announce == 'oke':
+            messagebox.showinfo('Info','Edit successfully!')
+        elif announce == 'error':
+            messagebox.showerror('Error','Edit failed!')
+        else:
+            self.result.configure(state = NORMAL)
+            self.result.insert(END,announce)
+            self.result.configure(state = DISABLED)
+        pass
+
+    def delResult(self):
+        self.result.configure(state = NORMAL)
+        self.result.delete(0,'end')
+        self.result.configure(state = DISABLED)
+        pass
+
+    def on_closing(self,func=None):
+        if func == None:
+            self.grab_release()
+            if self.master != None:
+                self.master.grab_set()
+            self.client.sendall(bytes(QUIT,"utf8"))
+            self.destroy()
+        else:
+            func.grab_release()
+            self.grab_set()
+            func.destroy()
+        pass
+
+
+
+
 
         
 
@@ -513,7 +671,7 @@ class App(Tk):
         self.key_btn = Button(self.fr2,text = "Keystroke",bd = 5,font = 10,padx = 10,pady = 10, command = self.Keystroke)
         self.key_btn.grid(column = 5, row = 0, columnspan = 2, rowspan = 2,sticky=N+S+E+W)
 
-        self.registry_btn = Button(self.fr2,text = "Edit registry",bd = 5,font = 10,padx = 10,pady = 10)
+        self.registry_btn = Button(self.fr2,text = "Edit registry",bd = 5,font = 10,padx = 10,pady = 10,command = self.Edit_registry)
         self.registry_btn.grid(column = 2, row = 2, columnspan = 4,sticky=N+S+E+W)
 
         self.exit_btn = Button(self.fr2,text = "Exit",bd = 5,font = 10,padx = 10,pady = 10, command =  self.exit)
@@ -598,6 +756,14 @@ class App(Tk):
         pass
 
     def Edit_registry(self):
+        if self.connected:
+            try:
+                self.client.sendall(bytes(EDIT_REGISTRY,'utf8'))
+                Viewapp = Registry(self.client,self)
+            except:
+                messagebox.showerror(title="Error", message="Opps\nConnection error!")    
+        else:
+            messagebox.showerror(title="Error", message="Opps\nConnection error!")
         pass
 
     def exit(self):
