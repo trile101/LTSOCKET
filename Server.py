@@ -91,7 +91,7 @@ def Process(Client_socket):
 			Client_socket.sendall(bytes('1','utf8'))
 			try:
 				name = Client_socket.recv(100).decode('utf8')
-				startfile('"C:/Windows/System32/' + name + '.exe"')
+				startfile(name + '.exe')
 				Client_socket.sendall(bytes('1','utf8'))
 			except:
 				Client_socket.sendall(bytes('0','utf8'))
@@ -144,7 +144,7 @@ def App(Client_socket):
 			Client_socket.sendall(bytes('1','utf8'))
 			try:
 				name = Client_socket.recv(100).decode('utf8')
-				startfile('"C:/Windows/System32/' + name + '.exe"')
+				startfile(name + '.exe')
 				Client_socket.sendall(bytes('1','utf8'))
 			except:
 				Client_socket.sendall(bytes('0','utf8'))
