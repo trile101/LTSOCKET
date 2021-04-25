@@ -649,22 +649,28 @@ class Registry(Toplevel):
 
     # Send request from client with regedit like get, set, delete value or create, delete key
     def sendToEdit(self):
+        print("aaa")
         self.client.sendall(bytes(EDIT,'utf8'))
         
         self.client.sendall(bytes(str(self.option.get()),'utf8'))
         self.client.recv(1)
+        print("bbb")
 
         self.client.sendall(bytes(str(self.path1.get()),'utf8'))
         self.client.recv(1)
+        print("ccc")
 
         self.client.sendall(bytes(str(self.name_entry.get()),'utf8'))
         self.client.recv(1)
+        print("ddd")
 
         self.client.sendall(bytes(str(self.value_entry.get()),'utf8'))
         self.client.recv(1)
+        print("eee")
 
         self.client.sendall(bytes(str(self.data_type.get()),'utf8'))
         self.client.recv(1)
+        print("fff")
 
         announce = self.client.recv(1024).decode('utf8')
         self.client.sendall(bytes('1','utf8'))
@@ -680,7 +686,7 @@ class Registry(Toplevel):
 
     def delResult(self):
         self.result.configure(state = NORMAL)
-        self.result.delete(0,'end')
+        self.result.delete('1.0',END)
         self.result.configure(state = DISABLED)
         pass
 
@@ -875,6 +881,7 @@ class App(Tk):
     def run(self):
         self.root.mainloop()
         pass
+
 
 
 #===============================                            ===============================#
